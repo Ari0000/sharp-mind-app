@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SharpMind - Trening Matematyczny</title>
+    <link rel="manifest" href="/manifest.json">
+    <link rel="stylesheet" href="App.css">
+    <script>
+        // Tu wklej poniższy kod JavaScript
+        function SharpMindApp() {
+            let exercise = {};
+            let userAnswer = '';
+            let score = { correct: 0, wrong: 0 };
+            let isOnline = navigator.onLine;
+            let deferredPrompt = null;
+            let showInstallButton = false;
+            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+
+            // Obsługa instalacji PWA
+            window.addEventListener('beforeinstallprompt', (e) => {
+                e.preventDefault();
+                deferredPrompt = e;
+                showInstallButton = true;
+                updateUI();
+            });
+
+            window.addEventListener('online', () => {
+                isOnline = true;
+                updateUI();
+            });
+            
+            window.addEventListener('offline', () => {
+                isOnline = false;
+                updateUI();
+                // Dodanie stylów dla przycisków i kolorów
+                document.documentElement.style.setProperty('--primary-color', '#8A2BE2'); // Fioletowy
+                document.documentElement.style.setProperty('--secondary-color', '#4169E1'); // Niebieski
+                
+                // Dodanie stylów dla przycisków
+                const buttons = document.querySelectorAll('button');
+                buttons.forEach(button => {
+                    button.style.backgroundColor = 'var(--primary-color)';
+                    button.style.color = 'white';
+                    button.style.padding = '10px 20px';
+                    button.style.border = 'none';
+                    button.style.borderRadius = '5px';
+                    button.style.cursor = 'pointer';
+                    button.style.margin = '5px';
+                    button.style.transition = 'background-color 0.3s';
+                });
+
+                // Ograniczenie wyników mnożenia do maksymalnie 500
+                if (exercise.operator === '*') {
+                    let maxNum1 = Math.floor(Math.sqrt(500));
+                    let maxNum2 = Math.floor(500 / maxNum1);
+                    exercise.num1 = Math.floor(Math.random() * maxNum1) + 1;
+                    exercise.num2 = Math.floor(Math.random() * maxNum2) + 1;
+                    exercise.correctAnswer = exercise.num1 * exercise.num2;
+                }
+            });
+
+            // Rejestracja Service Workera
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker
+                    .register('/service-worker.js')
+                    .then((registration) => console.log('ServiceWorker zarejestrowany:', registration))
+                    .catch((error) => console.log('Błąd rejestracji ServiceWorker:', error));
+            }
+
+            async function handleInstallClick() {
+                if (deferredPrompt) {
+                    deferredPrompt.prompt();
+                    const { outcome } = await deferredPrompt.userChoice;
+                    if (outcome === 'accepted') {
+                        showInstallButton = false;
+                    }
+                    deferredPrompt = null;
+                    updateUI();
+                }
+            }
+
+            function generateExercise() {
+                const operators = ['+', '-', '*', '/'];
+                const operator = operators[Math.floor(Math.random() * operators.length)];
+                let num1 = Math.floor(Math.random() * 501);
+                let num2 = Math.floor(Math.random() * 501);
+                
+                if (operator === '/') {
+                    num2 = Math.floor(Math.random() * 20) + 1;
+                    num1 = num2 * Math.floor(Math.random() * 25);
+                }
+
+                let correctAnswer;
+                switch(operator) {
+                    case '+': correctAnswer = num1 + num2; break;
+                    case '-': correctAnswer = num1 - num2; break;
+                    case '*': correctAnswer = num1 * num2; break;
+                    case '/': correctAnswer = num1 / num2; break;
+                    default: correctAnswer = 0;
+                }
+
+                return { num1, operator, num2, correctAnswer };
+            }
+
+            function checkAnswer() {
+                const isCorrect = Number(userAnswer) === exercise.correctAnswer;
+                score = {
+                    correct: score.correct + (isCorrect ? 1 : 0),
+                    wrong: score.wrong + (isCorrect ? 0 : 1)
+                };
+                userAnswer = '';
+                exercise = generateExercise();
+                updateUI();
+            }
+
+            function updateUI() {
+                document.querySelector('.exercise span:nth-child(1)').textContent = exercise.num1;
+                document.querySelector('.exercise span:nth-child(2)').textContent = exercise.operator;
+                document.querySelector('.exercise span:nth-child(3)').textContent = exercise.num2;
+                document.querySelector('input').value = userAnswer;
+                document.querySelector('.score p:nth-child(1)').textContent = `Poprawne: ${score.correct}`;
+                document.querySelector('.score p:nth-child(2)').textContent = `Błędne: ${score.wrong}`;
+                
+                const offlineMessage = document.querySelector('.offline-message');
+                if (!isOnline) {
+                    offlineMessage.style.display = 'block';
+                } else {
+                    offlineMessage.style.display = 'none';
+                }
+
+                const installButton = document.querySelector('.install-button');
+                if (!isIOS && showInstallButton) {
+                    installButton.style.display = 'block';
+                } else {
+                    installButton.style.display = 'none';
+                }
+            }
+
+            // Inicjalizacja
+            exercise = generateExercise();
+            updateUI();
+
+            // Dodaj nasłuchiwanie zdarzeń
+            document.querySelector('input').addEventListener('input', (e) => {
+                userAnswer = e.target.value;
+            });
+
+            document.querySelector('input').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') checkAnswer();
+            });
+
+            document.querySelector('button').addEventListener('click', checkAnswer);
+            document.querySelector('.install-button')?.addEventListener('click', handleInstallClick);
+        }
+
+        // Uruchom aplikację po załadowaniu DOM
+        document.addEventListener('DOMContentLoaded', SharpMindApp);
+    </script>
+</head>
+<body>
+    <div class="App">
+        <header class="App-header">
+            <h1>SharpMind - Trening Matematyczny</h1>
+            <div class="ios-install-info">
+                Aby zainstalować aplikację:
+                <ol>
+                    <li>Otwórz w Safari</li>
+                    <li>Kliknij ikonę Udostępnij</li>
+                    <li>Wybierz "Dodaj do ekranu początkowego"</li>
+                </ol>
+            </div>
+            <button class="install-button">Zainstaluj aplikację</button>
+            <div class="offline-message">Tryb offline - aplikacja nadal działa!</div>
+            <div class="exercise">
+                <span></span>
+                <span></span>
+                <span></span>
+                <span>=</span>
+                <input type="number" inputMode="numeric" pattern="[0-9]*">
+            </div>
+            <button>Sprawdź</button>
+            <div class="score">
+                <p></p>
+                <p></p>
+            </div>
+        </header>
+    </div>
+</body>
+</html>
